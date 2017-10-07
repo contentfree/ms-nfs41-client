@@ -1,5 +1,5 @@
 /* NFSv4.1 client for Windows
- * Copyright © 2012 The Regents of the University of Michigan
+ * Copyright Â© 2012 The Regents of the University of Michigan
  *
  * Olga Kornievskaia <aglo@umich.edu>
  * Casey Bodley <cbodley@umich.edu>
@@ -421,7 +421,9 @@ static void map_access_2_allowdeny(ULONG access_mask, ULONG access_mode,
             FILE_WRITE_ATTRIBUTES | FILE_READ_DATA | FILE_EXECUTE)))
         *allow = OPEN4_SHARE_ACCESS_READ | OPEN4_SHARE_ACCESS_WANT_NO_DELEG;
 
-#define FIX_ALLOW_DENY_WIN2NFS_CONVERSION
+// Uncomment the following line if the NFS server you're using allows share denying. AWS
+// EFS does not (http://docs.aws.amazon.com/efs/latest/ug/nfs4-unsupported-features.html)
+// #define FIX_ALLOW_DENY_WIN2NFS_CONVERSION
 #ifdef FIX_ALLOW_DENY_WIN2NFS_CONVERSION
     if ((access_mode & FILE_SHARE_READ) &&
             (access_mode & FILE_SHARE_WRITE))
