@@ -15,11 +15,11 @@
 
 ### Requirements
 
-*   Windows Vista, Windows Server 2008 R2, or Windows 7 (Windows XP and previous versions are not supported)
+*   Windows Vista, Windows Server 2008 R2, Windows 7, Windows Server 2012 R2 (Windows XP and previous versions are not supported)
 *   Microsoft Visual Studio 2010
-*   Windows Driver Development Kit (WinDDK 6000 or later)
+*   Windows Driver Development Kit (WinDDK 6000, 7600 known to work; maybe others)
 *   ms-nfs41-client source code:   
-    `> https://github.com/kofemann/ms-nfs41-client.git`
+    `> https://github.com/contentfree/ms-nfs41-client.git`
 
 ### Building the rpc library and nfs client daemon
 
@@ -27,7 +27,7 @@
 
 1.  Open Windows Explorer and navigate to **ms-nfs41-client\build.vc10**.
 2.  Make a copy of **env.props.example**, and rename it to **env.props**.
-3.  Open **env.props** in a text editor, and verify that the value in `<WDKPATH>C:\WinDDK\7600.16385.0</WDKPATH>` points to your WinDDK installation.
+3.  Open **env.props** in a text editor, and verify that the value in `<WDKPATH>C:\WinDDK\7600.16385.1</WDKPATH>` points to your WinDDK installation.
 4.  Open the solution file **ms-nfs41-client.sln** in Visual Studio 2010.
 5.  Select the desired configuration and platform (accessible via Build->Configuration Manager).
 6.  Right-click on the **daemon** project and select Build. The project and its dependencies should build without errors. The resulting binaries, **nfsd.exe** and **libtirpc.dll**, can be found under **ms-nfs41-client\build.vc10\x64\Debug\**.
@@ -35,15 +35,14 @@
 ### Building the driver and utilities
 
 1.  From the Start menu, open the WinDDK 'Checked Build Environment' for the target platform.
-2.  Change directory to **ms-nfs41-client** and type `build`. All projects should build without errors.
+2.  Change from the WinDDK directory to **ms-nfs41-client** and type `build`. All projects should build without errors.
 
 ### Signing the driver
 
-1.  Open a WinDDK 'Checked Build Environment' as Administrator in this directory (right click and 'Run as administrator').
-2.  Create a certificate for test-signing the driver ([Creating Test Certificates](http://msdn.microsoft.com/en-us/library/ff540213%28VS.85%29.aspx "msdn.microsoft.com")):   
-    `> makecert /pe /ss PrivateCertStore /n CN=nfs41_driver nfs41_driver.cer`
+1.  (If you're not still in the Checked Build Environment from above…) Open a WinDDK 'Checked Build Environment' as Administrator in the **ms-nfs41-client** directory (right click and 'Run as administrator').
+2.  Create a certificate for test-signing the driver ([Create Self-signed Certificates](https://blogs.technet.microsoft.com/askds/2012/08/14/rsa-key-blocking-is-here/). This requires creating an `.inf` file (ie. `selfsigned.inf`) and running `certreq -new selfsigned.inf selfsigned.crt` to generate the certificate.
 3.  Use the certificate to sign **nfs41_driver.sys** ([Test-Signing a Driver File](http://msdn.microsoft.com/en-us/library/ff553467%28VS.85%29.aspx "msdn.microsoft.com")):   
-    `> signtool sign /v /s PrivateCertStore /n nfs41_driver /t http://timestamp.verisign.com/scripts/timestamp.dll path\to\nfs41_driver.sys`
+    `> signtool sign /v /f selfsigned.crt /t http://timestamp.verisign.com/scripts/timestamp.dll path\to\nfs41_driver.sys`
 
 ## 2\. <a name="install">Installing Binaries</a>
 
@@ -55,8 +54,8 @@
 
 ### Instructions
 
-1.  Copy or extract all ms-nfs41-client binaries and configuration files into a directory that's convenient for testing.
-2.  Run **vcredist_x*.exe** to install the Visual C++ Redistributable Libraries.
+1.  Copy all the ms-nfs41-client binaries and configuration files listed in the Requirements section above into a directory that's convenient for testing.
+2.  Run **vcredist_x*.exe** to install the Visual C++ Redistributable Libraries. You may need to [download this from Microsoft](https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads) – Use the Visual Studio 2010 (VC++ 10.0) SP1 redistributable.
 3.  Double-click on **nfs41_driver.cer** and select 'Install Certificate', then place it in the 'Trusted Root Certificate Authorities' store.
 4.  Open a command prompt as Administrator in this directory.
 5.  Install the driver and update the registry:   
@@ -67,7 +66,7 @@
     `> copy ms-nfs41-idmap.conf C:\etc\`
 7.  Allow windows to load test-signed drivers:   
     `> bcdedit /set testsigning on`
-8.  Reboot.
+8.  Reboot. This is very important. Do not proceed without rebooting.
 
 ## 3\. <a name="dfs">Disable the DFS Client</a>
 
@@ -91,14 +90,16 @@
 
 ## 5\. <a name="startup">Starting the Client</a>
 
-*   If you've installed the binary distribution, you'll find two versions of the nfs client daemon: **nfsd.exe** and **nfsd_debug.exe**. **nfsd.exe** is built to run as a service, and does not provide easy access to debug output. We strongly recommend trying **nfsd_debug.exe** first (using the Instructions below) to verify that you can start the daemon and mount/unmount an nfs share. You can then close **nfsd_debug.exe** and start running **nfsd.exe** as a service with:  
+*   If you've installed the binary distribution, you'll find two versions of the nfs client daemon: **nfsd.exe** and **nfsd_debug.exe**. **nfsd.exe** is built to run as a service, and does not provide easy access to debug output. We strongly recommend trying **nfsd_debug.exe** first (using the Instructions below) to verify that you can start the daemon and mount/unmount an nfs share. 
+*   However, if you compiled the project yourself, you will not have a **nfsd_debug.exe** – in that case, you might still be able to test using `nfsd.exe -debug -d <debug level> [--noldap] [--uid ###] [--gid ###]`. It might warn you that `-debug` is not recognized but will still start running.
+*   You can then close **nfsd_debug.exe** and start running **nfsd.exe** as a service with:  
     `> nfsd.exe -install`.
 
 ### Instructions
 
 1.  From a Windows command prompt, run **nfsd.exe** to start the nfs client daemon. Leave this running in the background until all mapped drives are unmounted.   
     Usage:   
-    `> nfsd.exe -d <debug level> [--noldap]`
+    `> nfsd.exe -d <debug level> [--noldap] [--uid ###] [--gid ###]`
     *   `<debug level>` determines the log verbosity (1, 2, 3 or 0 to disable)
     *   `--noldap` disables id mapping and uses a default uid=666 and gid=777
     *   `--uid, --gid` changes the default uid/gid when no mapping is available (must be nonzero)
@@ -107,7 +108,7 @@
 
 ### Instructions
 
-1.  From a Windows command prompt run **nfs_mount.exe** to mount a share:   
+1.  From a Windows command prompt run **nfs_mount.exe** to mount a share (and use the `-p` flag to make the mount survive rebooting; after you've installed nfsd as a service):   
     `> nfs_mount.exe Z: <server_name>:\`
 2.  To specify the security flavor, add the 'sec=' mount option with sys, krb5, krb5i, or krb5p:   
     `> nfs_mount.exe -o sec=<flavor> Z: <server_name>:\`
